@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
     ];
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash-exp-image-generation", // Este es el modelo con Nano Banana 2
+      model: "gemini-2.5-flash-image", // Este es el modelo con Nano Banana 2
       contents: contents,
       config: {
         temperature: 1,
