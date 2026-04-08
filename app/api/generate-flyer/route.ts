@@ -16,6 +16,7 @@ export async function POST(req: NextRequest) {
 
     const replicate = new Replicate({
       auth: process.env.REPLICATE_API_TOKEN,
+      useFileOutput: false
     });
 
     // Ejecutar el modelo
