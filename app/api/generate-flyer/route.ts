@@ -3,25 +3,25 @@ import Replicate from 'replicate';
 
 const MODEL_IDENTIFIER = 'black-forest-labs/flux-kontext-pro';
 
+// Definimos un tipo para la respuesta de Replicate (puede variar)
+type ReplicateOutput = string | { url: string } | Array<{ url: string }> | any;
+
 export async function POST(req: NextRequest) {
   try {
-    // 1. Obtener los datos que envía el usuario
     const { prompt, imageBase64 } = await req.json();
 
     if (!prompt || !imageBase64) {
       return NextResponse.json({ error: 'Faltan el prompt o la imagen.' }, { status: 400 });
     }
 
-    // 2. Inicializar el cliente de Replicate con tu token
     const replicate = new Replicate({
       auth: process.env.REPLICATE_API_TOKEN,
     });
 
-    // 3. Ejecutar el modelo y obtener el resultado
-    // La API moderna devuelve un objeto que contiene la URL
-    const output = await replicate.run(MODEL_IDENTIFIER, {
+    // Ejecutar el modelo
+    const output: ReplicateOutput = await replicate.run(MODEL_IDENTIFIER, {
       input: {
-        prompt: `Crea un flyer turístico moderno y elegante. ... Texto principal: "${prompt}". ...`,
+        prompt: `Crea un flyer turístico moderno y elegante. Estilo minimalista y profesional. Texto principal: "${prompt}". Usa la imagen proporcionada como base y edítala para integrar este texto de forma armoniosa.`,
         input_image: imageBase64,
         aspect_ratio: 'match_input_image',
         output_format: 'png',
@@ -30,26 +30,31 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // 4. Extraer la URL de la imagen del objeto de salida.
-    //    Si el modelo devuelve varias imágenes, output será un array y tomamos la primera.
+    // Extraer la URL de la imagen
     let imageUrl: string | null = null;
-    if (output && typeof output === 'object') {
-      if (Array.isArray(output) && output[0] && typeof output[0].url === 'string') {
-        // Caso más común: la salida es un array de objetos con propiedad 'url'
-        imageUrl = output[0].url;
-      } else if (typeof output.url === 'string') {
-        // Caso alternativo: la salida es un solo objeto con propiedad 'url'
-        imageUrl = output.url;
-      }
+
+    // Caso 1: output es un string (URL directa)
+    if (typeof output === 'string') {
+      imageUrl = output;
+    }
+    // Caso 2: output es un objeto con propiedad url
+    else if (output && typeof output === 'object' && 'url' in output && typeof output.url === 'string') {
+      imageUrl = output.url;
+    }
+    // Caso 3: output es un array que contiene objetos con url (ej: [{url: "..."}])
+    else if (Array.isArray(output) && output.length > 0 && output[0] && typeof output[0] === 'object' && 'url' in output[0]) {
+      imageUrl = output[0].url as string;
+    }
+    // Caso 4: output es un array de strings
+    else if (Array.isArray(output) && output.length > 0 && typeof output[0] === 'string') {
+      imageUrl = output[0];
     }
 
-    // Si no se pudo obtener la URL, lanzamos un error
     if (!imageUrl) {
-      console.error('No se pudo extraer la URL de la salida:', output);
+      console.error('Formato de salida no reconocido:', JSON.stringify(output, null, 2));
       throw new Error('No se pudo obtener la URL de la imagen generada.');
     }
 
-    // 5. Devolver la URL al frontend de nuestra aplicación
     return NextResponse.json({ image: imageUrl });
   } catch (error: any) {
     console.error('Error en API Replicate:', error);
